@@ -1,4 +1,5 @@
 let vk = require('vksdk')
+const https = require("https");
 
 let client = new vk({
     appId: 6316719,
@@ -66,6 +67,75 @@ function ball(msg) {
 
 }
 
+function coins_top(msg) {
+    https.get('https://api.coinmarketcap.com/v1/ticker/?limit=10', res => {
+        let body = "";
+        res.on("data", data => {
+            body += data;
+        });
+        res.on("end", () => {
+            let coins = JSON.parse(body)
+            let index = 1
+            let text = ''
+
+            for (let coin of coins) {
+                //1. Bitcoin : 573.1333$
+                text += index + '. '
+                text += coin.name + ' (' + coin.symbol + ') : ' + coin.price_usd + '$'
+                text += '\n'
+                index += 1
+            }
+
+            client.request('messages.send',
+                {
+                    chat_id: msg.chat_id,
+                    message: text,
+                    forward_messages: msg.id
+                }, (msgRes) => {
+                    console.log(msgRes)
+                })
+        });
+    })
+}
+
+function coin_specific(msg) {
+    let msgBody = msg.body.toLowerCase()
+    let index = msgBody.indexOf('криптовалюта ') + 'криптовалюта'.length
+    let coinName = msgBody.substr(index + 1)
+    console.log('https://api.coinmarketcap.com/v1/ticker/' + coinName + '/')
+    https.get('https://api.coinmarketcap.com/v1/ticker/' + coinName + '/', res => {
+        let body = "";
+        res.on("data", data => {
+            body += data;
+        });
+        res.on("end", () => {
+            let text = ''
+            console.log(body)
+            try {
+                let coins = JSON.parse(body)
+                let coin = coins[0]
+                //1. Bitcoin : 573.1333$
+                text += coin.rank + '. '
+                text += coin.name + ' (' + coin.symbol + ') : ' + coin.price_usd + '$'
+                text += '\n'
+                text += 'Market Cap: ' + coin.market_cap_usd + '$' + '\n'
+            } catch (error) {
+                console.log(error)
+                text = 'Проверьте запрос'
+            }
+
+            client.request('messages.send',
+                {
+                    chat_id: msg.chat_id,
+                    message: text,
+                    forward_messages: msg.id
+                }, (msgRes) => {
+                    console.log(msgRes)
+                })
+        });
+    })
+}
+
 function iteration() {
     console.log('iteration')
     client.request('messages.get', { count: 20 }, (response) => {
@@ -73,16 +143,20 @@ function iteration() {
         //console.log(JSON.stringify(dialogs))
         for (let msg of dialogs) {
             if (msg.read_state == 0) {
-
                 let lowerCase = msg.body.toLowerCase()
                 if (lowerCase.search('казах') == 0) {
-                    client.request('messages.markAsRead', { message_ids: msg.id }, (readResponse) => { })
                     console.log(msg.body)
                     if (lowerCase.search('кто') != -1 && msg.chat_id != undefined) {
                         whoIs(msg)
                     }
                     else if (lowerCase.search('шар') != -1 && msg.chat_id != undefined) {
                         ball(msg)
+                    }
+                    else if (lowerCase.search('топ крипт') != -1 && msg.chat_id != undefined) {
+                        coins_top(msg)
+                    }
+                    else if (lowerCase.search('криптовалюта ') != -1 && msg.chat_id != undefined) {
+                        coin_specific(msg)
                     }
                 }
             }
