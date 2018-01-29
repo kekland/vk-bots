@@ -1,4 +1,5 @@
 let vk = require('vksdk')
+const http = require("http");
 const https = require("https");
 
 let client = new vk({
@@ -13,7 +14,7 @@ client.setToken('6c790a8b4f89a5aab1e973fea935e3f395f492c3a1dbfedf1bd65a99f006038
 let friends = []
 
 function getUsers(chat_id, listener) {
-    client.request('messages.getChatUsers', { chat_id: chat_id, fields: 'first_name, last_name' }, (response) => {
+    client.request('messages.getChatUsers', { chat_id: chat_id, fields: 'first_name, last_name, online' }, (response) => {
         listener(response.response)
     })
 }
@@ -21,6 +22,18 @@ function getUsers(chat_id, listener) {
 function getRandomUser(chat_id, listener) {
     getUsers(chat_id, (users) => {
         listener(users[Math.floor(Math.random() * users.length)])
+    })
+}
+
+function getRandomOnlineUser(chat_id, listener) {
+    getUsers(chat_id, (users) => {
+        let onlineUsers = []
+        for (let user of users) {
+            if (user.online == 1) {
+                onlineUsers.push(user)
+            }
+        }
+        listener(onlineUsers[Math.floor(Math.random() * onlineUsers.length)])
     })
 }
 function whoIs(msg) {
@@ -33,6 +46,15 @@ function whoIs(msg) {
     })
 }
 
+function whoIsOnline(msg) {
+    getRandomOnlineUser(msg.chat_id, (user) => {
+        let text = 'По моему мнению, это ' + user.first_name + ' ' + user.last_name
+        client.request('messages.send',
+            { chat_id: msg.chat_id, message: text, forward_messages: msg.id }, (msgRes) => {
+                console.log(msgRes)
+            })
+    })
+}
 function ball(msg) {
     let responses = ['Бесспорно',
         'Предрешено',
@@ -136,6 +158,55 @@ function coin_specific(msg) {
     })
 }
 
+function fact(msg) {
+    http.get('http://randstuff.ru/fact/', res => {
+        let body = "";
+        res.on("data", data => {
+            body += data;
+        });
+        res.on("end", () => {
+            let tdIndex = body.indexOf('<td>')
+            let text = body.substr(tdIndex + 4, body.indexOf('</td>') - tdIndex - 4)
+
+            client.request('messages.send',
+                {
+                    chat_id: msg.chat_id,
+                    message: text,
+                    forward_messages: msg.id
+                }, (msgRes) => {
+                    console.log(msgRes)
+                })
+        });
+    })
+}
+
+function roll(msg) {
+    let msgText = msg.body.toLowerCase()
+    let fromIndex = msgText.lastIndexOf('от')
+    let toIndex = msgText.lastIndexOf('до')
+
+    let num1 = parseInt(msgText.substr(fromIndex + 2, toIndex))
+    let num2 = parseInt(msgText.substr(toIndex + 2))
+
+    let text = ''
+    if (isNaN(num1) || isNaN(num2)) {
+        text = 'Проверьте параметры'
+    }
+    else {
+        if (num1 > num2) { let temp = num1; num1 = num2; num2 = temp;}
+        text = (Math.floor(Math.random() * (num2 - num1 + 1)) + num1).toString();
+    }
+
+    client.request('messages.send',
+        {
+            chat_id: msg.chat_id,
+            message: text,
+            forward_messages: msg.id
+        }, (msgRes) => {
+            console.log(msgRes)
+        })
+
+}
 function iteration() {
     console.log('iteration')
     client.request('messages.get', { count: 20 }, (response) => {
@@ -144,19 +215,30 @@ function iteration() {
         for (let msg of dialogs) {
             if (msg.read_state == 0) {
                 let lowerCase = msg.body.toLowerCase()
-                if (lowerCase.search('казах') == 0) {
+                if (lowerCase.search('казах') == 0 && msg.chat_id != undefined) {
                     console.log(msg.body)
-                    if (lowerCase.search('кто') != -1 && msg.chat_id != undefined) {
-                        whoIs(msg)
+                    if (lowerCase.search('кто') != -1) {
+                        if (lowerCase.search('онлайн') != -1) {
+                            whoIsOnline(msg)
+                        }
+                        else {
+                            whoIs(msg)
+                        }
                     }
-                    else if (lowerCase.search('шар') != -1 && msg.chat_id != undefined) {
+                    else if (lowerCase.search('шар') != -1) {
                         ball(msg)
                     }
-                    else if (lowerCase.search('топ крипт') != -1 && msg.chat_id != undefined) {
+                    else if (lowerCase.search('топ крипт') != -1) {
                         coins_top(msg)
                     }
-                    else if (lowerCase.search('криптовалюта ') != -1 && msg.chat_id != undefined) {
+                    else if (lowerCase.search('криптовалюта ') != -1) {
                         coin_specific(msg)
+                    }
+                    else if (lowerCase.search('факт') != -1) {
+                        fact(msg)
+                    }
+                    else if (lowerCase.search('рандом') != -1 && lowerCase.search('от') != -1 && lowerCase.search('до') != -1) {
+                        roll(msg);
                     }
                 }
             }
