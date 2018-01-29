@@ -207,6 +207,105 @@ function roll(msg) {
         })
 
 }
+
+function roll_dice(msg) {
+    let text = (Math.floor(Math.random() * (6 - 1 + 1)) + 1).toString();
+
+
+    client.request('messages.send',
+    {
+        chat_id: msg.chat_id,
+        message: text,
+        forward_messages: msg.id
+    }, (msgRes) => {
+        console.log(msgRes)
+    })
+}
+
+function flip_coin(msg) {
+    let text = 'Решка'
+
+    if (Math.random() > 0.5) {
+        text = 'Орёл'
+    }
+
+    client.request('messages.send',
+        {
+            chat_id: msg.chat_id,
+            message: text,
+            forward_messages: msg.id
+        }, (msgRes) => {
+            console.log(msgRes)
+        })
+}
+
+function add_emojis(msg) {
+    let text = msg.body
+    let textLower = msg.body.toLowerCase()
+    let substitute = '🅱'
+    let index = textLower.indexOf('b-emoji') + 'b-emoji'.length
+    text = text.substr(index)
+
+    let chars = ['б', 'в', 'г', 'д', 'ж', 'з', 'й', 'к', 'л', 'м', 'н', 'п', 'р', 'с', 'т', 'ф', 'х', 'ц', 'ч', 'ш', 'щ',
+        'Б', 'В', 'Г', 'Д', 'Ж', 'З', 'Й', 'К', 'Л', 'М', 'Н', 'П', 'Р', 'С', 'Т', 'Ф', 'Х', 'Ц', 'Ч', 'Ш', 'Щ',
+        'B', 'C', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'X', 'Y', 'Z',
+        'b', 'c', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'm', 'n', 'p', 'q', 'r', 's', 't', 'v', 'w', 'x', 'y', 'z']
+
+    let ctr = 0
+    let prevch = 'x'
+    let newText = ''
+    for (var i = 0; i < text.length; i++) {
+        var ch = text[i]
+        var b = false
+        for (let chc of chars) {
+            if (ch == chc) {
+                b = true
+            }
+        }
+        if (b && ctr < 1 && prevch != 'b') {
+            ctr++
+            newText += substitute
+            prevch = 'b'
+        }
+        else {
+            newText += ch
+            prevch = 'x'
+        }
+
+        if (ch == ' ') {
+            ctr = 0
+            prevch = 'x'
+        }
+    }
+
+    client.request('messages.send',
+        {
+            chat_id: msg.chat_id,
+            message: newText,
+            forward_messages: msg.id
+        }, (msgRes) => {
+            console.log(msgRes)
+        })
+}
+
+function whoIsKazakhToday(msg) {
+    getUsers(msg.chat_id, (users) => {
+        let now = new Date();
+        let start = new Date(now.getFullYear(), 0, 0);
+        let diff = now - start;
+        let oneDay = 1000 * 60 * 60 * 24;
+        let day = Math.floor(diff / oneDay);
+
+        let user = users[day % users.length]
+        let text = 'Сегодняшний казах -  ' + user.first_name + ' ' + user.last_name
+        client.request('messages.send',
+            { chat_id: msg.chat_id, message: text, forward_messages: msg.id }, (msgRes) => {
+                console.log(msgRes)
+            })
+
+    })
+}
+
 function iteration() {
     console.log('iteration')
     client.request('messages.get', { count: 20 }, (response) => {
@@ -217,7 +316,10 @@ function iteration() {
                 let lowerCase = msg.body.toLowerCase()
                 if (lowerCase.search('казах') == 0 && msg.chat_id != undefined) {
                     console.log(msg.body)
-                    if (lowerCase.search('кто') != -1) {
+                    if (lowerCase.search('сегодня казах') != -1) {
+                        whoIsKazakhToday(msg)
+                    }
+                    else if (lowerCase.search('кто') != -1) {
                         if (lowerCase.search('онлайн') != -1) {
                             whoIsOnline(msg)
                         }
@@ -240,10 +342,19 @@ function iteration() {
                     else if (lowerCase.search('рандом') != -1 && lowerCase.search('от') != -1 && lowerCase.search('до') != -1) {
                         roll(msg);
                     }
+                    else if (lowerCase.search('игральная кость') != -1 || lowerCase.search('дайс') != -1 || lowerCase.search('dice') != -1) {
+                        roll_dice(msg)
+                    }
+                    else if (lowerCase.search('монетк') != -1) {
+                        flip_coin(msg)
+                    }
+                    else if (lowerCase.search('b-emoji') != -1) {
+                        add_emojis(msg)
+                    }
                 }
             }
         }
     })
 
 }
-setInterval(iteration, 5000)
+setInterval(iteration, 2500)
